@@ -3,6 +3,7 @@ class Obstacles
   constructor()
   {
     this.arr = [];
+    this.matrix = [];
     if(arguments[0] == "de_dust2x2")
       this.de_dust2x2();
   }
@@ -136,5 +137,145 @@ class Obstacles
     this.add(new Rectangle(1700, 300, 50, 50));
     //36 box pre short
     this.add(new Rectangle(600, 1000, 50, 50));
+
+
+    let w = 2000;
+    let h = 2750;
+    for (let i = 0; i < w / 100; i++) {
+      this.matrix[i] = [];
+      for (let j = 0; j < h / 100; j++) {
+        this.matrix[i][j] = this.intersectingObjects(i, j);
+      }
+    }
+  }
+  intersectingObjects(i, j) {
+    let arr = [];
+    let square = new Rectangle(i * 100, j * 100, 100, 100);
+    for (const obj of this.arr) {
+      if(collider.collide(obj, square))
+        arr.push(obj);
+    }
+    return arr;
+  }
+}
+
+
+class Ray {
+  constructor(x, y, angle) {
+    this.pos = createVector(x, y);
+    this.mag = 10;
+  }
+  show() {
+    this.dir = createVector(mouseX, mouseY).sub(this.pos).setMag(this.mag);
+    this.dir.add(createVector(1, 1));
+    line(this.pos.x, this.pos.y, this.pos.x + this.dir.x, this.pos.y + this.dir.y);
+  }
+  cast(pos, arr) {
+    let dist = signedDistance(pos, arr);
+    if (dist > 1) {
+      stroke(255, 0, 0);
+      ellipse(pos.x, pos.y, dist * 2, dist * 2);
+      const newPoint = pos.copy().add(this.dir.copy().setMag(dist));
+      if (offScreen(newPoint))
+        return 0;
+      return dist + this.cast(newPoint, arr);
+    }
+    return 0;
+  }
+}
+function offScreen(pos) {
+  return (pos.x < 0 || pos.x > width || pos.y < 0 || pos.y > height);
+}
+function signedDistance(pos, arr) {
+  let record = Infinity;
+  for (let i = 0; i < arr.length; i++) {
+    let distance = dist(pos.x, pos.y, arr[i].pos.x, arr[i].pos.y) - arr[i].r / 2;
+    if (distance < record)
+      record = distance;
+  }
+  return record;
+}
+class Point {
+  constructor(x, y) {
+    this.shape = "point";
+    this.pos = createVector(x, y);
+  }
+  show() {
+    fill(255);
+    ellipse(this.pos.x, this.pos.y, 4, 4);
+  }
+}
+class Line {
+  constructor(x1, y1, x2, y2) {
+    this.shape = "line";
+    this.a = createVector(x1, y1);
+    this.b = createVector(x2, y2);
+  }
+  show() {
+    stroke(255);
+    line(this.a.x, this.a.y, this.b.x, this.b.y);
+  }
+}
+class Circle {
+  constructor(x, y, r) {
+    this.shape = "circle";
+    this.pos = createVector(x, y);
+    this.r = r;
+  }
+  show() {
+    if (arguments.length == 0) {
+      noFill();
+      stroke(255);
+    }
+    else {
+      fill(arguments[0]);
+      stroke(arguments[0]);
+    }
+    ellipse(this.pos.x, this.pos.y, this.r, this.r);
+  }
+}
+class Rectangle {
+  constructor(x, y, w, h) {
+    this.shape = "rectangle";
+    this.pos = createVector(x, y);
+    this.dim = createVector(w, h);
+  }
+  show() {
+    if (arguments.length == 0) {
+      noFill();
+      stroke(255);
+    }
+    else {
+      fill(arguments[0]);
+      stroke(arguments[0]);
+    }
+    rect(this.pos.x, this.pos.y, this.dim.x, this.dim.y);
+  }
+}
+class Poly {
+  constructor() {
+    this.shape = "poly";
+    this.vertices = [];
+    this.size = 0;
+    for (let i = 0; i < arguments.length; i += 2)
+      this.vertices[this.size++] = createVector(arguments[i], arguments[i + 1]);
+  }
+  show() {
+    if (arguments.length == 0) {
+      noFill();
+      stroke(255);
+    }
+    else {
+      fill(arguments[0]);
+      stroke(arguments[0]);
+    }
+    beginShape();
+    for (let i = 0; i < this.size; i++)
+      vertex(this.vertices[i].x, this.vertices[i].y);
+    endShape(CLOSE);
+  }
+  moveBy(x, y) {
+    for (let i = 0; i < this.vertices.length; i++)
+      this.vertices[i].add(x, y);
   }
 }
