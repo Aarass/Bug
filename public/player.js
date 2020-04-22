@@ -41,7 +41,9 @@ class Player {
   collides(obs)
   {
     for (const obstacle of obs) 
-      return collider.collide(this.hitbox, obstacle);
+      if( collider.collide(this.hitbox, obstacle) )
+        return true;
+    return false;
   }
   //SHOTING
   //------------------------------------------------------------------
