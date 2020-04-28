@@ -58,8 +58,10 @@ class Cursor {
         }
     }
     click() {
-        let x = this.target.pos.x + this.pos.x;
-        let y = this.target.pos.y + this.pos.y;
-        //Send click to server
+        let data = {
+            x: this.target.pos.x + this.pos.x,
+            y: this.target.pos.y + this.pos.y
+        }
+        socket.emit('click', data);
     }
 }

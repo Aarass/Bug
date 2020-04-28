@@ -1,15 +1,19 @@
 let bg;
 let ctModel = [], tModel = [];
-let map;
+let dust
+async function loadMap() {
+    let raw = await fetch('./de_dust2x2.json');
+    dust = await raw.json();
+}
 function preload() {
     bg = loadImage('./assets/map.png');
     for (let i = 0; i < 37; i++)
         ctModel.push(loadImage("Assets/Animation/ct/tile" + i + ".png"));
     for (let i = 0; i < 37; i++)
         tModel.push(loadImage("Assets/Animation/t/tile" + i + ".png"));
+    loadMap();
 }
 const socket = io();
-
 
 
 //Manje bitne
@@ -17,64 +21,71 @@ const socket = io();
 let isScreenLocked;
 let pointerRadius = 8;  
 //------------------------
-
+let map;
 let player;
 let pointer;
+let playersList = {};
 function setup() {
-    createCanvas(windowWidth, windowHeight);
+    createCanvas(1280, 720);
     isScreenLocked = false;
-    player = new Player(true, 5, 20);
-    pointer = new Cursor(player);
-    map = new Obstacles('de_dust2x2');
+    map = new Maps.Construct(dust);
+    socket.emit('ready');
 }
 function draw() {
-    background(255, 150, 100);
-    push();
+    if(player)
+    {
+        background(255, 150, 100);
+        push();
         translate(-player.pos.x + width / 2, -player.pos.y + height / 2);
         image(bg, 0, 0);
-        player.update(map.matrix[Math.floor(player.pos.x/100)][Math.floor(player.pos.y/100)]);
-        for (const obs of map.matrix[Math.floor(player.pos.x / 100)][Math.floor(player.pos.y / 100)]) {
-            obs.show(color(150));
+        player.update();
+        for (const key in playersList) {
+            if (playersList.hasOwnProperty(key)) {
+                const element = playersList[key];
+                element.show();
+            }
         }
-    pop();
-    pointer.show();
+        pop();
+        pointer.show();
+    }
 }
-
-// socket.on('NewPlayer', (data) => {
-//     console.log(data);
-// });
-// socket.on('initial', (data) => {
-//     enemies = data;
-// });
-// socket.on('newPlayer', (data) => {
-//     enemies[data.id] = {
-//         x: data.x,
-//         y: data.y
-//     };
-// });
-// socket.on('position', (pos) => {
-//     player.x = pos.x;
-//     player.y = pos.y;
-// });
-// socket.on('enemyMoved', (data) => {
-//     enemies[data.id].x = data.x;
-//     enemies[data.id].y = data.y;
-// });
-// socket.on('playerDisconnected', (id) => {
-//     delete enemies[id];
-// });
-// function move() {
-//     if (left)
-//         socket.emit('keydown', 'left');
-//     if (right)
-//         socket.emit('keydown', 'right');
-//     if (up)
-//         socket.emit('keydown', 'up');
-//     if (down)
-//         socket.emit('keydown', 'down');
-// }
+socket.on('someone moved', (data) => {
+    playersList[data.id].move(data.pos);
+});
+socket.on('players in sight', (data) => {
+    for (const key in data) {
+        if (data.hasOwnProperty(key)) {
+            const element = data[key];
+            playersList[element.id].pos = element.pos;
+        }
+    }
+});
+socket.on('initial', (data) => {
+    //me
+    player = new Player(data.me.pos.x, data.me.pos.y, data.me.type);
+    pointer = new Cursor(player);
+    //playersNonSensitiveData
+    for (const key in data.playersInfo) {
+        if (data.playersInfo.hasOwnProperty(key)) {
+            const element = data.playersInfo[key];
+            if(element.id != data.me.id)
+            playersList[element.id] = new notMe(element.id, element.type);
+        }
+    }
+});
+socket.on('hacked position', (pos) => {
+    player.pos.x = pos.x;
+    player.pos.y = pos.y;
+});
+socket.on('new player', (data) => {
+    playersList[data.id] = new notMe(data.id, data.type);
+});
+socket.on('player disconnected', (id) => {
+    delete playersList[id];
+});
 function mouseMoved() {
-    pointer.move(movedX, movedY);
+    if (isScreenLocked) 
+        pointer.move(movedX, movedY);
 }
 function keyPressed() {
     if (key == 'a' || key == 'A' || keyCode === LEFT_ARROW)
@@ -99,9 +110,8 @@ function keyReleased() {
 function mousePressed() {
     if (!isScreenLocked) {
         requestPointerLock();
-        if(player.isAlive)
-            pointer.click();
     }
+    pointer.click();
 }
 document.addEventListener('pointerlockchange', () => {
     isScreenLocked = !isScreenLocked

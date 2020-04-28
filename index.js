@@ -1,59 +1,128 @@
+const fs = require('fs');
 const express = require('express');
 const app = express();
 const port = process.env.PORT || 80;
 const server = app.listen(port);
 const io = require('socket.io')(server);
-
+const dust = JSON.parse(fs.readFileSync('./public/de_dust2x2.json'));
+const mapClass = require('./public/obstacles.js');
+const map = new mapClass.Construct(dust);
 app.use(express.static('public'));
-
-let playersList = {};    
-let movingSpeed = 5;                                                                                     
-
+const ctSpawn = {
+    x: 1400,
+    y: 600
+}
+const tSpawn = {
+    x: 200,
+    y: 2500
+}
+let playerSpeed = 5;
+let playersList = {};
+let playersInfo = {};
+let cts = [], ts = [];
 
 io.on('connection', (socket) => {
-    //Dodavanje novog igraca u listu
-    playersList[socket.id] = {
-        id: socket.id,
-        x: 500,
-        y: 500
+    //Dodavanje novog igraca u listu i odvajanje u grupe
+    if (ts.length >= cts.length) {
+        playersList[socket.id] = new Player(ctSpawn.x, ctSpawn.y, socket.id, "ct");
+        playersInfo[socket.id] = {
+            id: socket.id,
+            type: 'ct'
+        };
+        cts.push(socket.id);
+    } else {
+        playersList[socket.id] = new Player(tSpawn.x, tSpawn.y, socket.id, "t");
+        playersInfo[socket.id] = {
+            id: socket.id,
+            type: 't'
+        };
+        ts.push(socket.id);
     }
 
-    //Obavestavanje novog igraca o vec konektovanim igracima
-    //Potrebna izmena jer je nebezbedno
-    let others = Object.assign({}, playersList);
-    delete others[socket.id];
-    socket.emit('initial', others);
+    //Slanje inicijalnih podataka novom igracu
+    let initialData = {
+        me: playersList[socket.id],
+        playersInfo
+    };
+    socket.on('ready', () => {
+        socket.emit('initial', initialData);
+    });
 
     //Obavestavanje ostalih igraca da se konektovao nov igrac
-    //Potrebna izmena jer je nebezbedno
-    socket.broadcast.emit('newPlayer', playersList[socket.id]);
+    //Verovatno treba poboljsanja
+    let newPlayerData = playersInfo[socket.id];
+    socket.broadcast.emit('new player', newPlayerData);
 
-    //Rukovanje kretanja
-    //Potreban collision detect
-    socket.on('keydown', (dir) => {
-        if (dir == 'left')
-            playersList[socket.id].x -= movingSpeed;
-        if (dir == 'right')
-            playersList[socket.id].x += movingSpeed;
-        if (dir == 'up')
-            playersList[socket.id].y -= movingSpeed;
-        if (dir == 'down')
-            playersList[socket.id].y += movingSpeed;
-        //Pomeranje igraca koji je pritusnuo taster
-        socket.emit('position', {
-            x: playersList[socket.id].x,
-            y: playersList[socket.id].y
-        });
-        //Slanje novih koordinata ostalim igracima
-        //Potrebna izmena jer nije bezbedno
-        socket.broadcast.emit('enemyMoved', {
-            id: playersList[socket.id].id,
-            x: playersList[socket.id].x,
-            y: playersList[socket.id].y
-        });
+
+    socket.on('position', (data) => {
+        let isHacking = false;
+        //Provera da li se igrac krece brze od dozvoljenje brzine
+        if (Math.abs(data.pos.x - playersList[socket.id].pos.x) > playerSpeed * 2)
+            isHacking = true;
+        if (Math.abs(data.pos.y - playersList[socket.id].pos.y) > playerSpeed * 2)
+            isHacking = true;
+        //Provera da li se igrac kolajduje sa necim
+        if (map.check(data))
+            isHacking = true;
+        //Ako je ispunjeno nesto od prethodnih uslova
+        //Igracu koji se nalazi gde ne treba, salje se posledja validna pozicija
+        if(isHacking) 
+            socket.emit('hacked position', playersList[socket.id].pos);
+        //Ako je sve u redu
+        //Azurira se igraceva pozicija na serveru, i
+        //Ostalim igracima se salje nova pozicija
+        else {
+            playersList[socket.id].pos.x = data.pos.x;
+            playersList[socket.id].pos.y = data.pos.y;
+            let closeOnes = inSight(playersList[socket.id]);
+            for (const key in closeOnes) {
+                if (closeOnes.hasOwnProperty(key)) {
+                    const element = closeOnes[key];
+                    socket.to(element.id).emit('someone moved', {
+                        id: socket.id,
+                        pos: playersList[socket.id].pos
+                    });
+                }
+            }
+            socket.emit('players in sight', closeOnes);
+        }
     });
     socket.on('disconnect', () => {
         delete playersList[socket.id];
-        socket.broadcast.emit('playerDisconnected', socket.id);
-    })
+        delete playersInfo[socket.id];
+        var index = cts.indexOf(socket.id);
+        if (index > -1) 
+            cts.splice(index, 1);
+        index = ts.indexOf(socket.id);
+        if (index > -1)
+            ts.splice(index, 1);
+        socket.broadcast.emit('player disconnected', socket.id);
+    });
 });
+class Player {
+    constructor(x, y, id, type) {
+        this.pos = {
+            x: x,
+            y: y
+        }
+        this.id = id;
+        this.type = type;
+    }
+}
+function inSight(p) {
+    let seen = {};
+    for (const key in playersList) {
+        if (playersList.hasOwnProperty(key)) {
+            const element = playersList[key];
+            if(p == element)
+                continue;
+            if (map.seeEachOther(p, element))
+                seen[element.id] = {
+                    id: element.id,
+                    pos: element.pos,
+                    type: element.type
+                }
+        }
+    }
+    return seen;
+}
