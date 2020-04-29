@@ -8,9 +8,9 @@ async function loadMap() {
 function preload() {
     bg = loadImage('./assets/map.png');
     for (let i = 0; i < 37; i++)
-        ctModel.push(loadImage("./Assets/Animation/ct/tile" + i + ".png"));
+        ctModel.push(loadImage("./assets/animation/ct/tile" + i + ".png"));
     for (let i = 0; i < 37; i++)
-        tModel.push(loadImage("./Assets/Animation/t/tile" + i + ".png"));
+        tModel.push(loadImage("./assets/animation/t/tile" + i + ".png"));
     loadMap();
 }
 const socket = io();
