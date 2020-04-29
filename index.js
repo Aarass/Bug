@@ -17,96 +17,180 @@ const tSpawn = {
     y: 2500
 }
 let playerSpeed = 5;
+let playerRadius = 30;
 let playersList = {};
-let playersInfo = {};
-let cts = [], ts = [];
+let positions = {};
 
 io.on('connection', (socket) => {
     //Dodavanje novog igraca u listu i odvajanje u grupe
-    if (ts.length >= cts.length) {
+    if (Object.keys(playersList).length % 2 == 0)
         playersList[socket.id] = new Player(ctSpawn.x, ctSpawn.y, socket.id, "ct");
-        playersInfo[socket.id] = {
-            id: socket.id,
-            type: 'ct'
-        };
-        cts.push(socket.id);
-    } else {
+    else
         playersList[socket.id] = new Player(tSpawn.x, tSpawn.y, socket.id, "t");
-        playersInfo[socket.id] = {
-            id: socket.id,
-            type: 't'
-        };
-        ts.push(socket.id);
-    }
 
+    const current = playersList[socket.id];
     //Slanje inicijalnih podataka novom igracu
-    let initialData = {
-        me: playersList[socket.id],
-        playersInfo
-    };
+    let initialData = {};
+    for (const key in playersList) {
+        if (playersList.hasOwnProperty(key)) {
+            const element = playersList[key];
+            initialData[element.id] = {
+                id: element.id,
+                type: element.type
+            }
+        }
+    }
     socket.on('ready', () => {
-        socket.emit('initial', initialData);
+        socket.emit('players', initialData);
+        socket.emit('me', current);
     });
 
     //Obavestavanje ostalih igraca da se konektovao nov igrac
     //Verovatno treba poboljsanja
-    let newPlayerData = playersInfo[socket.id];
-    socket.broadcast.emit('new player', newPlayerData);
+    socket.broadcast.emit('new player', {
+        id: current.id,
+        type: current.id
+    });
 
 
-    socket.on('position', (data) => {
-        let isHacking = false;
-        //Provera da li se igrac krece brze od dozvoljenje brzine
-        if (Math.abs(data.pos.x - playersList[socket.id].pos.x) > playerSpeed * 2)
-            isHacking = true;
-        if (Math.abs(data.pos.y - playersList[socket.id].pos.y) > playerSpeed * 2)
-            isHacking = true;
-        //Provera da li se igrac kolajduje sa necim
-        if (map.check(data))
-            isHacking = true;
-        //Ako je ispunjeno nesto od prethodnih uslova
-        //Igracu koji se nalazi gde ne treba, salje se posledja validna pozicija
-        if(isHacking) 
-            socket.emit('hacked position', playersList[socket.id].pos);
-        //Ako je sve u redu
-        //Azurira se igraceva pozicija na serveru, i
-        //Ostalim igracima se salje nova pozicija
-        else {
-            playersList[socket.id].pos.x = data.pos.x;
-            playersList[socket.id].pos.y = data.pos.y;
-            let closeOnes = inSight(playersList[socket.id]);
-            for (const key in closeOnes) {
-                if (closeOnes.hasOwnProperty(key)) {
-                    const element = closeOnes[key];
-                    socket.to(element.id).emit('someone moved', {
-                        id: socket.id,
-                        pos: playersList[socket.id].pos
-                    });
+    socket.on('move', (data) => {
+        current.left = data.left;
+        current.right = data.right;
+        current.up = data.up;
+        current.down = data.down;
+        current.move();
+        if(positions[data.id])
+            positions[data.id][socket.id] = JSON.parse(JSON.stringify(playersList[socket.id]));
+        else
+            positions[data.id] = JSON.parse(JSON.stringify(playersList));
+
+
+        let seen = {};
+        let unseen = {};
+        for (const key in playersList) {
+            if (playersList.hasOwnProperty(key)) {
+                const element = playersList[key];
+                if(current == element)
+                    continue;
+                if(map.seeEachOther(current, element)) {
+                    seen[element.id] = element;
+                    io.to(element.id).emit('visible enemy', current);
+                } else {
+                    unseen[element.id] = element;
+                    io.to(element.id).emit('unvisible enemy', current.id);
                 }
             }
-            socket.emit('players in sight', closeOnes);
         }
+        socket.emit('move respond', {
+            timestamp: data.id,
+            position: positions[data.id][socket.id].pos,
+            visible: seen,
+            unvisible: unseen
+        });
     });
     socket.on('disconnect', () => {
         delete playersList[socket.id];
-        delete playersInfo[socket.id];
-        var index = cts.indexOf(socket.id);
-        if (index > -1) 
-            cts.splice(index, 1);
-        index = ts.indexOf(socket.id);
-        if (index > -1)
-            ts.splice(index, 1);
         socket.broadcast.emit('player disconnected', socket.id);
     });
 });
 class Player {
-    constructor(x, y, id, type) {
+    constructor(_x, _y, id, type) {
         this.pos = {
-            x: x,
-            y: y
+            x: _x,
+            y: _y
         }
+        this.radius = playerRadius;
+        this.speed = playerSpeed;
         this.id = id;
         this.type = type;
+    }
+    move() {
+        let ms;
+        if (this.left || this.right || this.up || this.down) {
+            ms = Date.now();
+            io.to(this.id).emit('move', {
+                left: this.left,
+                right: this.right,
+                up: this.up,
+                down: this.down,
+                id: ms
+            });
+        }
+        if (this.up) {
+            this.moveUp();
+            if (this.collides())
+                if (!this.tryLeft())
+                    if (!this.tryRight())
+                        this.undoUp();
+        }
+        if (this.down) {
+            this.moveDown();
+            if (this.collides())
+                if (!this.tryLeft())
+                    if (!this.tryRight())
+                        this.undoDown();
+        }
+        if (this.right) {
+            this.moveRight();
+            if (this.collides())
+                if (!this.tryUp())
+                    if (!this.tryDown())
+                        this.undoRight();
+        }
+        if (this.left) {
+            this.moveLeft();
+            if (this.collides())
+                if (!this.tryUp())
+                    if (!this.tryDown())
+                        this.undoLeft();
+        }
+        if (ms)
+            positions[ms] = {
+                x: this.pos.x,
+                y: this.pos.y
+            };
+    }
+    tryUp() {
+        this.moveUp();
+        if (this.collides())
+            return this.undoUp();
+        return true;
+    }
+    tryDown() {
+        this.moveDown();
+        if (this.collides())
+            return this.undoDown();
+        return true;
+    }
+    tryLeft() {
+        this.moveLeft();
+        if (this.collides())
+            return this.undoLeft();
+        return true;
+    }
+    tryRight() {
+        this.moveRight();
+        if (this.collides())
+            return this.undoRight();
+        return true;
+    }
+    moveUp() { this.pos.y -= this.speed; }
+    moveDown() { this.pos.y += this.speed; }
+    moveLeft() { this.pos.x -= this.speed; }
+    moveRight() { this.pos.x += this.speed; }
+    undoUp() { this.pos.y += this.speed; return false; }
+    undoDown() { this.pos.y -= this.speed; return false; }
+    undoLeft() { this.pos.x += this.speed; return false; }
+    undoRight() { this.pos.x -= this.speed; return false; }
+    collides() {
+        return (map.check({
+            shape: "circle",
+            pos: {
+                x: this.pos.x,
+                y: this.pos.y
+            },
+            r: this.radius
+        }));
     }
 }
 function inSight(p) {

@@ -11,7 +11,7 @@ class Map
   check(hitbox) {
     let i = Math.floor(hitbox.pos.x / this.gridCellSize);
     let j = Math.floor(hitbox.pos.y / this.gridCellSize);
-    if(i => 0 && j >= 0 && i < 20 && j < 28) {
+    if(i >= 0 && j >= 0 && i < 20 && j < 28) {
       for(let obstacle of this.matrix[i][j]) 
         if(collide(hitbox, obstacle))
           return true;

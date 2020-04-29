@@ -1,13 +1,12 @@
 class Player {
-  constructor(x, y, type) {
-    this.startingPosition = createVector(x, y);
+  constructor(id, type) {
+    this.id = id;
     this.isCt = type == 'ct';
     this.speed = playerSpeed;
     this.radius = playerRadius;
     this.spawn();
   }
   spawn() {
-    this.pos = createVector(this.startingPosition.x, this.startingPosition.y);
     this.isAlive = true;
     this.health = 100;
     this.killCount = 0;
@@ -18,177 +17,130 @@ class Player {
   }
   update()
   {
-    this.show();
-    if(this.isAlive)
+    if(this.pos) {
+      this.show();
       this.move();
-  }
-  //SHOTING
-  //------------------------------------------------------------------
-  shoot(x, y)
-  {
-    const ray = {
-      shape: "ray",
-      a: createVector(this.pos.x, this.pos.y),
-      b: createVector(this.pos.x + x, this.pos.y + y)
     }
-    line(ray.a.x, ray.a.y, ray.a.x + ray.b.copy().sub(ray.a).setMag(width*2).x, ray.a.y + ray.b.copy().sub(ray.a).setMag(width*2).y);
-    console.log(`Shot at ${x}, ${y}`);
-    //Placeholder for client-server communication
+  }
+  updateOthers()
+  {
+    if(this.pos) {
+      this.show();
+      if(this.desiredPos) {
+        if(this.pos.x < this.desiredPos.x) {
+          this.pos.x += playerSpeed;
+          this.right = true;
+          this.left = false;
+        }
+        else if(this.pos.x > this.desiredPos.x) {
+          this.pos.x -= playerSpeed;
+          this.right = false;
+          this.left = true;
+        }
+        else {
+          this.right = false;
+          this.left = false;
+        }
+        if (this.pos.y < this.desiredPos.y) {
+          this.pos.y += playerSpeed;
+          this.down = true;
+          this.up = false;
+        }
+        else if (this.pos.y > this.desiredPos.y) {
+          this.pos.y -= playerSpeed;
+          this.down = false;
+          this.up = true;
+        }
+        else {
+          this.down = false;
+          this.up = false;
+        }
+      }
+    }
+  }
+  interpolateTo(data) {
+    this.desiredPos = data;
   }
   //MOVING
   //----------------------------------------------------------------
-  move()
-  {
-    let isPositionChanged = false;
-    if(this.up)
-    {
+  move() {
+    let ms;
+    if (this.left || this.right || this.up || this.down) {
+      ms = Date.now();
+      socket.emit('move', {
+        left: this.left,
+        right: this.right,
+        up: this.up,
+        down: this.down,
+        id: ms
+      });
+    }
+    if (this.up) {
       this.moveUp();
-      if(this.collides())
-      {
-        if(!this.tryLeft())
-          if(!this.tryRight())
+      if (this.collides())
+        if (!this.tryLeft())
+          if (!this.tryRight())
             this.undoUp();
-          else
-          isPositionChanged = true;
-        else
-          isPositionChanged = true;
-        } 
-      else 
-      isPositionChanged = true;
     }
-    if(this.down)
-    {
+    if (this.down) {
       this.moveDown();
-      if(this.collides())
-      {
-        if(!this.tryLeft())
-          if(!this.tryRight())
+      if (this.collides())
+        if (!this.tryLeft())
+          if (!this.tryRight())
             this.undoDown();
-            else
-            isPositionChanged = true;
-            else
-          isPositionChanged = true;
-      }
-      else
-        isPositionChanged = true;
-      }
-    if(this.right)
-    {
+    }
+    if (this.right) {
       this.moveRight();
-      if(this.collides())
-      {
-        if(!this.tryUp())
-        if(!this.tryDown())
+      if (this.collides())
+        if (!this.tryUp())
+          if (!this.tryDown())
             this.undoRight();
-          else
-          isPositionChanged = true;
-        else
-          isPositionChanged = true;
-      }
-      else
-      isPositionChanged = true;
     }
-    if(this.left)
-    {
+    if (this.left) {
       this.moveLeft();
-      if(this.collides())
-      {
-        if(!this.tryUp())
-          if(!this.tryDown())
+      if (this.collides())
+        if (!this.tryUp())
+          if (!this.tryDown())
             this.undoLeft();
-            else
-            isPositionChanged = true;
-        else
-        isPositionChanged = true;
-      }
-      else
-      isPositionChanged = true;
     }
-    if(isPositionChanged) {
-      //Send new posiiton to server
-      const data = {
-        shape: "circle",
-        pos:  {
-          x: this.pos.x,
-          y: this.pos.y
-        },
-        r: this.radius
+    if(ms)
+      positions[ms] = {
+        x: this.pos.x,
+        y: this.pos.y
       };
-      socket.emit('position', data);
-    }
   }
-  tryUp()
-  {
+  tryUp() {
     this.moveUp();
-    if(this.collides())
-    {
-      this.undoUp();
-      return false;
-    }
+    if (this.collides())
+      return this.undoUp();
     return true;
   }
-  tryDown()
-  {
+  tryDown() {
     this.moveDown();
-    if(this.collides())
-    {
-      this.undoDown();
-      return false;
-    }
+    if (this.collides())
+      return this.undoDown();
     return true;
   }
-  tryLeft()
-  {
+  tryLeft() {
     this.moveLeft();
-    if(this.collides())
-    {
-      this.undoLeft();
-      return false;
-    }
+    if (this.collides())
+      return this.undoLeft();
     return true;
   }
-  tryRight()
-  {
+  tryRight() {
     this.moveRight();
-    if(this.collides())
-    {
-      this.undoRight();
-      return false;
-    }
+    if (this.collides())
+      return this.undoRight();
     return true;
   }
-  moveUp()
-  {
-    this.pos.add(createVector(0, -1).setMag(this.speed));
-  }
-  moveDown()
-  {
-    this.pos.add(createVector(0, 1).setMag(this.speed));
-  }
-  moveLeft()
-  {
-    this.pos.add(createVector(-1, 0).setMag(this.speed));
-  }
-  moveRight()
-  {
-    this.pos.add(createVector(1, 0).setMag(this.speed));
-  }
-  undoUp()
-  {
-    this.pos.sub(createVector(0, -1).setMag(this.speed));
-  }
-  undoDown()
-  {
-    this.pos.sub(createVector(0, 1).setMag(this.speed));
-  }
-  undoLeft()
-  {
-    this.pos.sub(createVector(-1, 0).setMag(this.speed));
-  }
-  undoRight()
-  {
-    this.pos.sub(createVector(1, 0).setMag(this.speed));
-  }
+  moveUp() { this.pos.y -= this.speed; }
+  moveDown() { this.pos.y += this.speed; }
+  moveLeft() { this.pos.x -= this.speed; }
+  moveRight() { this.pos.x += this.speed; }
+  undoUp() { this.pos.y += this.speed; return false; }
+  undoDown() { this.pos.y -= this.speed; return false; }
+  undoLeft() { this.pos.x += this.speed; return false; }
+  undoRight() { this.pos.x -= this.speed; return false; }
   show()
   {
     imageMode(CENTER);
