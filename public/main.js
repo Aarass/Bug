@@ -66,7 +66,10 @@ socket.on('move respond', (data) => {
     for (const key in data.visible) {
         if (data.visible.hasOwnProperty(key)) {
             const element = data.visible[key];
-            playersList[element.id].pos = element.pos;
+            if (playersList[element.id].pos != undefined)
+                playersList[element.id].interpolateTo(element.pos);
+            else
+                playersList[element.id].pos = element.pos;
         }
     }
 
@@ -80,12 +83,10 @@ socket.on('move respond', (data) => {
     
 });
 socket.on('visible enemy', (data) => {
-    if(playersList[data.id].pos != undefined) {
-        //Interpolate
+    if(playersList[data.id].pos != undefined)
         playersList[data.id].interpolateTo(data.pos);
-    } else {
+    else
         playersList[data.id].pos = data.pos;
-    }
 });
 socket.on('unvisible enemy', (id) => {
     playersList[id].pos = undefined;

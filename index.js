@@ -106,16 +106,8 @@ class Player {
     }
     move() {
         let ms;
-        if (this.left || this.right || this.up || this.down) {
+        if (this.left || this.right || this.up || this.down)
             ms = Date.now();
-            io.to(this.id).emit('move', {
-                left: this.left,
-                right: this.right,
-                up: this.up,
-                down: this.down,
-                id: ms
-            });
-        }
         if (this.up) {
             this.moveUp();
             if (this.collides())

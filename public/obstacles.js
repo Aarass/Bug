@@ -109,7 +109,8 @@ function collide(objectA, objectB) {
   return eval(objectA.shape + "By" + capitalized(objectB.shape) + "(objectA, objectB);");
 }
 function dist(x1, y1, x2, y2) {
-  return Math.sqrt(Math.pow(x1 - x2) + Math.pow(y1 -y2));
+  let result = Math.sqrt(Math.pow(x1 - x2, 2) + Math.pow(y1 -y2, 2));
+  return result;
 }
 function capitalized(s) {
   return s.charAt(0).toUpperCase() + s.slice(1)
@@ -181,9 +182,9 @@ function lineByCircle(objectA, objectB) {
   const distX = closestX - cx;
   const distY = closestY - cy;
   const distance = Math.sqrt((distX * distX) + (distY * distY));
-
   return (distance <= r && pointByLine({ pos: { x: closestX, y: closestY } }, objectA))
 }
+function circleByLine(objectA, objectB) { return lineByCircle(objectB, objectA) }
 function circleByLine(objectA, objectB) { return lineByCircle(objectB, objectA) }
 function rayByCircle(objectA, objectB) {
   const x1 = objectA.a.x;
