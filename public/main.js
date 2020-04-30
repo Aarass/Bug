@@ -56,10 +56,10 @@ function draw() {
 socket.on('move respond', (data) => {
     //Provera da ne cituje
     let current = positions[data.timestamp];
-    // if (current.x != data.position.x)
-    //     me.pos.x = data.position.x;
-    // if (current.x != data.position.y)
-    //     me.pos.y = data.position.y;
+    if (current.x != data.position.x)
+        me.pos.x = data.position.x;
+    if (current.y != data.position.y)
+        me.pos.y = data.position.y;
 
 
     //Update-ovanje vidljivih
