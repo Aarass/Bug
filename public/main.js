@@ -115,6 +115,10 @@ function mouseMoved() {
     if (isScreenLocked) 
         pointer.move(movedX, movedY);
 }
+function mouseDragged() {
+    if (isScreenLocked) 
+        pointer.move(movedX, movedY);
+}
 function keyPressed() {
     if (key == 'a' || key == 'A' || keyCode === LEFT_ARROW)
         me.left = true;
