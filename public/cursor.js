@@ -1,6 +1,9 @@
 class Cursor {
     constructor(player) {
-        this.pos = createVector(0, 0);
+        this.pos = {
+            x: 0,
+            y: 0
+        }
         this.target = player;
         this.shape = 'circle';
         this.size = 8;

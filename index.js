@@ -88,6 +88,26 @@ io.on('connection', (socket) => {
             unvisible: unseen
         });
     });
+    socket.on('click', (pointer) => {
+        const start = {
+            x: current.pos.x,
+            y: current.pos.y,
+        };
+        const end = {
+            x: pointer.x,
+            y: pointer.y,
+        };
+        let seen = inSight(current);
+        for (const key in seen) {
+            if (seen.hasOwnProperty(key)) {
+                const element = seen[key];
+                io.to(element.id).emit('enemy shooted', {
+                    start,
+                    end
+                });
+            }
+        }
+    });
     socket.on('disconnect', () => {
         delete playersList[socket.id];
         socket.broadcast.emit('player disconnected', socket.id);

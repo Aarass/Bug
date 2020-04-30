@@ -25,12 +25,14 @@ let map;
 let myId;
 let me;
 let pointer;
+let bulletManager;
 let positions = {};
 let playersList = {};
 function setup() {
     createCanvas(1280, 720);
     isScreenLocked = false;
     map = new Maps.Construct(dust);
+    bulletManager = new BulletsManager();
     socket.emit('ready');
 }
 function draw() {
@@ -49,6 +51,7 @@ function draw() {
                     element.updateOthers();
             }
         }
+        bulletManager.show();
         pop();
         pointer.show();
     }
@@ -140,11 +143,16 @@ function keyReleased() {
         me.down = false;
 }
 function mousePressed() {
-    if (!isScreenLocked) {
+    if (!isScreenLocked)
         requestPointerLock();
+    else {
+        bulletManager.queueUp(me.pos, pointer.pos);
+        socket.emit('click', pointer.pos);
     }
-    pointer.click();
 }
+socket.on('enemy shooted', (data)=> {
+    bulletManager.queueUp(data.start, data.end);
+});
 document.addEventListener('pointerlockchange', () => {
     isScreenLocked = !isScreenLocked
 });

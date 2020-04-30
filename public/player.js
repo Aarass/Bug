@@ -173,7 +173,7 @@ class Player {
         else if(this.left)
         image(tModel[(floor(frameCount/4) % 8) + 8], this.pos.x, this.pos.y);
         else if(this.up)
-          image(tModel[(floor(frameCount/4) % 8) + 1], this.pos.x, this.pos.y);
+        image(tModel[(floor(frameCount/4) % 8) + 1], this.pos.x, this.pos.y);
         else if(this.down)
         image(tModel[(floor(frameCount/4) % 8) + 28], this.pos.x, this.pos.y);
         else
