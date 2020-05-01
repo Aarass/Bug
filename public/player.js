@@ -1,7 +1,8 @@
 class Player {
-  constructor(id, type) {
+  constructor(id, type, name) {
     this.id = id;
     this.isCt = type == 'ct';
+    this.name = name;
     this.speed = playerSpeed;
     this.radius = playerRadius;
     this.spawn();
@@ -64,6 +65,8 @@ class Player {
   //MOVING
   //----------------------------------------------------------------
   move() {
+    if(!this.isAlive)
+      return; 
     let ms;
     if (this.left || this.right || this.up || this.down) {
       ms = Date.now();
@@ -143,6 +146,14 @@ class Player {
   undoRight() { this.pos.x -= this.speed; return false; }
   show()
   {
+    if(this.name) {
+      textAlign(CENTER, CENTER);
+      textSize(16);
+      textFont('Courier New');
+      strokeWeight(0)
+      fill(0);
+      text(this.name, this.pos.x, this.pos.y - 50);
+    }
     imageMode(CENTER);
     if(this.isCt)
     {

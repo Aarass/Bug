@@ -23,10 +23,10 @@ let positions = {};
 
 io.on('connection', (socket) => {
     //Dodavanje novog igraca u listu i odvajanje u grupe
+    let team;
     if (Object.keys(playersList).length % 2 == 0)
-        playersList[socket.id] = new Player(ctSpawn.x, ctSpawn.y, socket.id, "ct");
-    else
-        playersList[socket.id] = new Player(tSpawn.x, tSpawn.y, socket.id, "t");
+        team = 'ct';
+    playersList[socket.id] = new Player(socket.id, team);
 
     const current = playersList[socket.id];
     //Slanje inicijalnih podataka novom igracu
@@ -35,25 +35,30 @@ io.on('connection', (socket) => {
         if (playersList.hasOwnProperty(key)) {
             const element = playersList[key];
             initialData[element.id] = {
+                name: element.name,
                 id: element.id,
                 type: element.type
             }
         }
     }
-    socket.on('ready', () => {
+    socket.on('ready', (name) => {
+        current.name = name;
         socket.emit('players', initialData);
         socket.emit('me', current);
+        
+        //Obavestavanje ostalih igraca da se konektovao nov igrac
+        //Verovatno treba poboljsanja
+        socket.broadcast.emit('new player', {
+            id: current.id,
+            name: current.name,
+            type: current.id
+        });
     });
-
-    //Obavestavanje ostalih igraca da se konektovao nov igrac
-    //Verovatno treba poboljsanja
-    socket.broadcast.emit('new player', {
-        id: current.id,
-        type: current.id
-    });
-
+        
 
     socket.on('move', (data) => {
+        if (!current.isAlive)
+            return;
         current.left = data.left;
         current.right = data.right;
         current.up = data.up;
@@ -88,22 +93,41 @@ io.on('connection', (socket) => {
             unvisible: unseen
         });
     });
-    socket.on('click', (pointer) => {
-        const start = {
-            x: current.pos.x,
-            y: current.pos.y,
-        };
-        const end = {
-            x: pointer.x,
-            y: pointer.y,
-        };
-        let seen = inSight(current);
+    socket.on('click', (data) => {
+        if (!current.isAlive)
+            return;
+        const ray = {
+            shape: 'ray',
+            a: {
+                x: current.pos.x,
+                y: current.pos.y
+            },
+            b: {
+                x: current.pos.x + data.pos.x,
+                y: current.pos.y + data.pos.y,
+            },
+            bprime: {
+                x: data.pos.x,
+                y: data.pos.y
+            }
+        }
+        let seen = shootable(current, data.id);
         for (const key in seen) {
             if (seen.hasOwnProperty(key)) {
                 const element = seen[key];
+                if(current.type != element.type && map.hit(ray, element)) {
+                    if (element.takeDamage(40)) {
+                        io.emit('dead player', element.id); 
+                        setTimeout(() => {
+                            element.spawn();
+                            io.to(element.id).emit('respawn', element);
+                            io.emit('respawn player', element); 
+                        }, 3000);
+                    }  
+                }
                 io.to(element.id).emit('enemy shooted', {
-                    start,
-                    end
+                    start: ray.a,
+                    end: ray.bprime
                 });
             }
         }
@@ -114,20 +138,38 @@ io.on('connection', (socket) => {
     });
 });
 class Player {
-    constructor(_x, _y, id, type) {
-        this.pos = {
-            x: _x,
-            y: _y
-        }
+    constructor(id, type) {
+        this.name;
+        this.shape = 'circle';
         this.radius = playerRadius;
         this.speed = playerSpeed;
         this.id = id;
         this.type = type;
+        this.spawn();
+    }
+    spawn() {
+        if (this.type == 'ct')
+            this.pos = {
+                x: ctSpawn.x,
+                y: ctSpawn.y
+            }
+        else
+            this.pos = {
+                x: tSpawn.x,
+                y: tSpawn.y
+            }
+        this.isAlive = true;
+        this.health = 100;
+    }
+    takeDamage(amount) {
+        this.health -= amount;
+        if(this.health <= 0) {
+            this.health = 0;
+            this.isAlive = false;
+            return true;
+        }
     }
     move() {
-        let ms;
-        if (this.left || this.right || this.up || this.down)
-            ms = Date.now();
         if (this.up) {
             this.moveUp();
             if (this.collides())
@@ -156,11 +198,6 @@ class Player {
                     if (!this.tryDown())
                         this.undoLeft();
         }
-        if (ms)
-            positions[ms] = {
-                x: this.pos.x,
-                y: this.pos.y
-            };
     }
     tryUp() {
         this.moveUp();
@@ -218,6 +255,25 @@ function inSight(p) {
                     pos: element.pos,
                     type: element.type
                 }
+        }
+    }
+    return seen;
+}
+function shootable(p, id) {
+    let seen = {};
+    let list;
+    if(positions[id])
+        list = positions[id]
+    else 
+        list = playersList;
+    for (const key in list) {
+        if (list.hasOwnProperty(key)) {
+            const element = list[key];
+            
+            if(p == element)
+                continue;
+            if (map.areShootable(p, element))
+                seen[element.id] = element;
         }
     }
     return seen;

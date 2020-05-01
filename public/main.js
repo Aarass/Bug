@@ -33,7 +33,8 @@ function setup() {
     isScreenLocked = false;
     map = new Maps.Construct(dust);
     bulletManager = new BulletsManager();
-    socket.emit('ready');
+    let name = prompt('Type your name');
+    socket.emit('ready', name);
 }
 function draw() {
     if(me)
@@ -98,7 +99,7 @@ socket.on('players', (data) => {
     for (const key in data) {
         if (data.hasOwnProperty(key)) {
             const element = data[key];
-            playersList[element.id] = new Player(element.id, element.type);
+            playersList[element.id] = new Player(element.id, element.type, element.name);
         }
     }
 });
@@ -109,7 +110,18 @@ socket.on('me', (data) => {
     pointer = new Cursor(me);
 });
 socket.on('new player', (data) => {
-    playersList[data.id] = new Player(data.id, data.type);
+    playersList[data.id] = new Player(data.id, data.type, data.name);
+});
+socket.on('dead player', (id) => {
+    playersList[id].isAlive = false;
+});
+socket.on('respawn player', (data) => {
+    playersList[data.id].isAlive = true;
+    playersList[data.id].pos = createVector(data.pos.x, data.pos.y);
+});
+socket.on('respawn', (data) => {
+    me.isAlive = true;
+    playersList[myId].pos = createVector(data.pos.x, data.pos.y);
 });
 socket.on('player disconnected', (id) => {
     delete playersList[id];
@@ -147,7 +159,10 @@ function mousePressed() {
         requestPointerLock();
     else {
         bulletManager.queueUp(me.pos, pointer.pos);
-        socket.emit('click', pointer.pos);
+        socket.emit('click', {
+            pos: pointer.pos,
+            id: Date.now()
+        });
     }
 }
 socket.on('enemy shooted', (data)=> {

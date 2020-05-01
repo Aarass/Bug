@@ -19,11 +19,39 @@ class Map
     } else 
     return true;
   }
+  hit(shape1 ,shape2) {
+    if(collide(shape1, shape2))
+      return true;
+    return false;
+  }
   seeEachOther(hitbox1, hitbox2) {
     if(Math.abs(hitbox1.pos.x - hitbox2.pos.x) > 640)
       return false;
     if(Math.abs(hitbox1.pos.y - hitbox2.pos.y) > 360)
       return false;
+    let field = raytrace(hitbox1.pos.x / this.gridCellSize,
+      hitbox1.pos.y / this.gridCellSize,
+      hitbox2.pos.x / this.gridCellSize,
+      hitbox2.pos.y / this.gridCellSize);
+    let line = {
+      shape: 'line',
+      a: {
+        x: hitbox1.pos.x,
+        y: hitbox1.pos.y,
+      },
+      b: {
+        x: hitbox2.pos.x,
+        y: hitbox2.pos.y,
+      }
+    };
+    for(let square of field) {
+      for (let obstacle of this.matrix[square.i][square.j])
+        if (collide(line, obstacle))
+          return false;
+    }
+    return true;
+  }
+  areShootable(hitbox1, hitbox2) {
     let field = raytrace(hitbox1.pos.x / this.gridCellSize,
       hitbox1.pos.y / this.gridCellSize,
       hitbox2.pos.x / this.gridCellSize,
@@ -193,7 +221,7 @@ function rayByCircle(objectA, objectB) {
   const y2 = objectA.b.y;
   const cx = objectB.pos.x;
   const cy = objectB.pos.y;
-  const r = objectB.r / 2;
+  const r = objectB.radius / 2;
   if (dist(x1, y1, cx, cy) < r)
     return true;
   if (dist(x2, y2, cx, cy) < r)
@@ -206,9 +234,8 @@ function rayByCircle(objectA, objectB) {
   const distX = closestX - cx;
   const distY = closestY - cy;
   const distance = Math.sqrt((distX * distX) + (distY * distY));
-  const dist1 = Math.sqrt(pow(x1 - cx, 2) + Math.pow(y1 - cy, 2));
-  const dist2 = Math.sqrt(pow(x2 - cx, 2) + Math.pow(y2 - cy, 2));
-
+  const dist1 = Math.sqrt(Math.pow(x1 - cx, 2) + Math.pow(y1 - cy, 2));
+  const dist2 = Math.sqrt(Math.pow(x2 - cx, 2) + Math.pow(y2 - cy, 2));
   return (distance <= r && dist1 > dist2)
 }
 function circleByRay(objectA, objectB) { return rayByCircle(objectB, objectA) }
