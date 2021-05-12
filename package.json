@@ -4,7 +4,7 @@
   "main": "index.js",
   "dependencies": {
     "express": "^4.17.1",
-    "mathjs": "^6.6.4",
+    "mathjs": "^7.5.1",
     "node-fetch": "^2.6.0",
     "socket.io": "^2.3.0"
   },
